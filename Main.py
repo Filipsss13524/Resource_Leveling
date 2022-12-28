@@ -32,7 +32,7 @@ def f_move(nroz, name, point):
     move_list = [[name, ns]]
     for element in move_list:
         for a in c.enum_data.keys():
-            if (element[0], a) in c.relation_list:
+            if (element[0], a) in c.relation_list and a not in critical_path:
                 nroz[c.enum_data[a]] = 0
                 nroz[c.enum_data[a], element[1]:element[1] + data.loc[c.enum_data[a], 'Time']] = 1
                 move_list.append((a, element[1] + data.loc[c.enum_data[a], 'Time']))
@@ -52,12 +52,13 @@ def create_population(first_soluction, size):
     for i in range(size - 1):
         nroz = first_soluction.copy()
         los = random.sample(lis, 1)
+        print(los[0])
         if z[c.enum_task[los[0]]] != 0:
             zn = random.randint(1, z[c.enum_task[los[0]]])
             nroz[c.enum_data[los[0]]] = 0
-            nroz[c.enum_data[los[0]],
-            Tw[c.enum_task[los[0]]] + zn:Tw[c.enum_task[los[0]]] + data.loc[c.enum_data[los[0]], 'Time'] + zn] = 1
+            nroz[c.enum_data[los[0]], Tw[c.enum_task[los[0]]] + zn:Tw[c.enum_task[los[0]]] + data.loc[c.enum_data[los[0]], 'Time'] + zn] = 1
             nroz_m = f_move(nroz, los[0], Tw[c.enum_task[los[0]]] + data.loc[c.enum_data[los[0]], 'Time'] + zn)
+            print(nroz_m)
             population.append(nroz_m)
         else:
             population.append(nroz)
@@ -78,24 +79,25 @@ def fitness(population, goal_f, res_num, weight):
     Resource = []
     Fitness = {}
     row = len(c.enum_data)
-    col = Tw[-1]
     index = 0
     for pi in population:
-        res = np.zeros((res_num, col))
-        for i in range(col):
+        res = np.zeros((res_num, len(pi[0])))
+        for i in range(len(pi[0])):
             for j in range(row):
-                # jeśli będzie przerabiana funkcja celu to w tym miejscu 2,3 itd
                 if pi[j][i] == 1:
                     for idx in range(res_num):
-                        res[idx][i] += data.loc[j, f'R{idx+1}']
+                        res[idx][i] += data.loc[j, f'R{idx + 1}']
+                if pi[j][i] == 2:
+                    for idx in range(res_num):
+                        res[idx][i] += data.loc[j, f'R{idx + 1}'] / 2
         Resource.append(res)
 
     if goal_f == 1:
         for pf in range(len(population)):
             fit = np.zeros(res_num)
             for l in range(res_num):
-                fit[l] = round(weight[l] * np.max(Resource[pf][l]) / sum(data.loc[:, f'R{l+1}']), 3)
-            Fitness[index] = sum(fit)
+                fit[l] = round(weight[l] * np.max(Resource[pf][l]) / sum(data.loc[:, f'R{l + 1}']), 3) * 10
+            Fitness[index] = sum(fit) + len(Resource[pf][0]) - Tp[-1]
             index += 1
 
     elif goal_f == 2:
@@ -103,7 +105,7 @@ def fitness(population, goal_f, res_num, weight):
             fit = np.zeros(res_num)
             for l in range(res_num):
                 fit[l] = round(weight[l] * sum(np.abs(np.mean(Resource[pf][l]) - Resource[pf][l])), 3)
-            Fitness[index] = sum(fit)
+            Fitness[index] = sum(fit) + len(Resource[pf][0]) - Tp[-1]
             index += 1
     else:
         print("Wybrana zła funkcja celu")
@@ -128,18 +130,25 @@ def selection(population, fitness, resource, mode, size):
     if mode == 1:  # koło ruletki
         new_list = []
         val = 1 / (list(fitness.values()) / sum(fitness.values()))
-        weight = val / sum(val)
+        weight = val / sum(val) * 100
+        # print(weight)
+        # print(len(weight))
         while len(new_list) != size:
+            # print("HELP ME")
             licz = random.choices(list(fitness.keys()), weights=weight, k=15)
+            # print(licz)
+            # print(weight)
             if licz[0] not in new_list:
                 new_list.append(licz[0])
+                weight[licz[0]] = 0.5
         for idx, i in enumerate(new_list):
             new_population.append(population[i])
             new_resources.append(resource[i])
             new_fitness[idx] = fitness[i]
+        print(len(new_population))
 
     elif mode == 2:  # rankingowa
-        new_list = sorted(fitness, key = fitness.get)[0:size]
+        new_list = sorted(fitness, key=fitness.get)[0:size]
         for idx, i in enumerate(new_list):
             new_population.append(population[i])
             new_resources.append(resource[i])
@@ -161,107 +170,230 @@ def cross(population, f, g):
     lis = [x for x in c.enum_task.keys() if x not in c.get_critical_path(z)]
     rozf = population[f]
     rozg = population[g]
-    for i in lis:
-        l = c.enum_data[i]
-        if np.all(rozf[l] == rozg[l]):
-            continue
-        else:
-            where_rozf = np.argwhere(rozf[l] == 1)
-            where_rozg = np.argwhere(rozg[l] == 1)
-            where_start = [where_rozf[0][0] if where_rozf[0][0] < where_rozg[0][0] else where_rozg[0][0]]
-            where_end = [where_rozf[-1][0] if where_rozf[-1][0] > where_rozg[-1][0] else where_rozg[-1][0]]
-            rel_mat = []
-            for rel in c.enum_data:
-                if (rel, i) in c.relation_list or (i, rel) in c.relation_list:
-                    num_rel = c.enum_data[rel]
-                    rel_mat.append(num_rel)
+    if len(rozf[0]) == len(rozg[0]):
+        for i in lis:
+            l = c.enum_data[i]
+            if np.all(rozf[l] == rozg[l]):
+                continue
+            else:
+                # where_rozf = np.argwhere(rozf[l] == 1)
+                # where_rozg = np.argwhere(rozg[l] == 1)
+                where_rozf = np.argwhere(rozf[l] != 0)
+                where_rozg = np.argwhere(rozg[l] != 0)
+                where_start = [where_rozf[0][0] if where_rozf[0][0] < where_rozg[0][0] else where_rozg[0][0]]
+                where_end = [where_rozf[-1][0] if where_rozf[-1][0] > where_rozg[-1][0] else where_rozg[-1][0]]
+                rel_mat = []
+                for rel in c.enum_data:
+                    if (rel, i) in c.relation_list or (i, rel) in c.relation_list:
+                        num_rel = c.enum_data[rel]
+                        rel_mat.append(num_rel)
 
-            rozf_copy = rozf.copy()
-            rozg_copy = rozg.copy()
-            sum_rozf = np.sum(rozf[rel_mat, where_start[0]:where_end[0] + 1])
-            sum_rozg = np.sum(rozg[rel_mat, where_start[0]:where_end[0] + 1])
-            if sum_rozf == 0:
-                rozf_copy[l] = rozg[l]
-                population.append(rozf_copy)
-            if sum_rozg == 0:
-                rozg_copy[l] = rozf[l]
-                population.append(rozg_copy)
-            if sum_rozf != 0 and sum_rozg != 0 and (data.loc[l, 'Time'] < where_end[0] - where_start[0] - sum_rozg or data.loc[l, 'Time'] < where_end[0] - where_start[0] - sum_rozf):
-                w_rozf = rozf_copy[rel_mat, where_start[0]:where_end[0] + 1]
-                w_rozg = rozg_copy[rel_mat, where_start[0]:where_end[0] + 1]
-                if (sum(w_rozf[:][0]) > 0 or sum(w_rozg[:][0]) > 0) and (sum(w_rozf[:][-1]) > 0 or sum(w_rozg[:][-1]) > 0):
-                    nc = np.zeros(len(population[0][0]))
-                    for idx,x,y in zip(np.linspace(where_start[0],where_end[0],len(w_rozf[0])),sum(w_rozf), sum(w_rozg)):
-                        if x == 0 and y == 0 and sum(nc) < data.loc[l, 'Time']:
-                            nc[int(idx)] = 1
-                    rozg_copy[l] = nc[:]
-                    rozf_copy[l] = nc[:]
-                    population.append(rozg_copy)
+                rozf_copy = rozf.copy()
+                rozg_copy = rozg.copy()
+                sum_rozf = np.sum(rozf[rel_mat, where_start[0]:where_end[0] + 1])
+                sum_rozg = np.sum(rozg[rel_mat, where_start[0]:where_end[0] + 1])
+                if sum_rozf == 0:
+                    rozf_copy[l] = rozg[l]
                     population.append(rozf_copy)
-                else:
-                    continue
+                if sum_rozg == 0:
+                    rozg_copy[l] = rozf[l]
+                    population.append(rozg_copy)
+                # Psuje wyniki
+                # if sum_rozf != 0 and sum_rozg != 0 and (
+                #         data.loc[l, 'Time'] < where_end[0] - where_start[0] - sum_rozg or data.loc[l, 'Time'] < where_end[
+                #     0] - where_start[0] - sum_rozf):
+                #     w_rozf = rozf_copy[rel_mat, where_start[0]:where_end[0] + 1]
+                #     w_rozg = rozg_copy[rel_mat, where_start[0]:where_end[0] + 1]
+                #     if (sum(w_rozf[:][0]) > 0 or sum(w_rozg[:][0]) > 0) and (sum(w_rozf[:][-1]) > 0 or sum(w_rozg[:][-1]) > 0):
+                #         nc = np.zeros(len(rozf[0]))
+                #         for idx, x, y in zip(np.linspace(where_start[0], where_end[0], len(w_rozf[0])), sum(w_rozf),
+                #                              sum(w_rozg)):
+                #             if x == 0 and y == 0 and sum(nc) < data.loc[l, 'Time']:
+                #                 nc[int(idx)] = 1
+                #         rozg_copy[l] = nc[:]
+                #         rozf_copy[l] = nc[:]
+                #         population.append(rozg_copy)
+                #         population.append(rozf_copy)
+                #     else:
+                #         continue
 
     return population
 
 
-def mutation(population,resources,mutation_list):
-    r = 1
+def mutation(population, resources, mutation_list, limit_block, optim_resource = 1):
     for i in mutation_list:
-        print(resources[i])
-        print(np.mean(resources[i][0]))
-        act_pop = population[i]
-        max_w = np.abs(max(resources[i][r-1]) - np.mean(resources[i][r-1]))
-        min_w = np.abs(min(resources[i][r-1]) - np.mean(resources[i][r-1]))
-        if min_w > max_w:
-            index_list = np.where(resources[i][r-1] == min(resources[i][r-1]))[0]
+        act_pop = population[i].copy()
+        max_w = np.abs(max(resources[i][optim_resource - 1]) - np.mean(resources[i][optim_resource - 1]))
+        min_w = np.abs(min(resources[i][optim_resource - 1]) - np.mean(resources[i][optim_resource - 1]))
+        lis = [c.enum_data[x] for x in c.enum_task.keys() if x not in critical_path]  # nie list lecz sądziedzi
+        lis2 = [x for x in c.enum_task.keys() if x not in critical_path]
+        k = list(c.enum_data.keys())
+        v = list(c.enum_data.values())
+        go_min = 0
+        maxxx = np.linspace(1,int(L_iter/10),int(L_iter/10))  # wymusza maxa co 10 iteracji
+        if Iter / 10 in maxxx:
+            # print("wykonałem")
+            max_w += 2
+        if max_w > min_w:
+            print("max")
+            print(act_pop)
+            index_list = np.where(resources[i][0] == max(resources[i][0]))[0]
+            ile_dz = 0
+            if limit_block[1] == 1:
+                for x in index_list:
+                    list_wynik = []
+                    for licz, il in enumerate(act_pop[:, x]):
+                        if licz in lis and il == 1:
+                            cz = lis2[lis.index(licz)]
+                            rel_mat = [licz]
+                            for rel in c.enum_data:
+                                if (rel, cz) in c.relation_list or (cz, rel) in c.relation_list:
+                                    num_rel = c.enum_data[rel]
+                                    rel_mat.append(num_rel)
+                            where_roz = np.argwhere(act_pop[licz] != 0)
+                            if x != 0 and np.all(act_pop[rel_mat, x - 1] == 0):
+                                list_wynik.append((1, licz, data.loc[licz, f'R{optim_resource}']))  # left bliski
+                            if x != len(population[i][0]) - 1 and np.all(act_pop[rel_mat, x + 1] == 0):
+                                list_wynik.append((2, licz, data.loc[licz, f'R{optim_resource}']))  # right bliski
+                            # if x != 0 and where_roz[0] != x and where_roz[0] - 1 != -1 and np.all(act_pop[rel_mat, where_roz[0] - 1] == 0):
+                            #     list_wynik.append((3, licz, data.loc[licz, f'R{optim_resource}']))  # left daleki
+                            # if x != len(population[i][0]) and where_roz[-1] != len(population[i][0]) - 1 and np.all(act_pop[rel_mat, where_roz[-1] + 1] == 0):
+                            #     list_wynik.append((4, licz, data.loc[licz, f'R{optim_resource}']))  # right daleki
+
+                    if list_wynik:
+                        num = random.randint(0, (len(list_wynik)) - 1)
+                        w = list_wynik[num]
+                        if w[0] == 1:
+                            act_pop[w[1], x-1:x+1] = 2
+                            ile_dz += 1
+                        if w[0] == 2:
+                            act_pop[w[1], x:x+2] = 2
+                            ile_dz += 1
+                        # if w[0] == 3:
+                        #     act_pop[w[1], [where_roz[0][0] - 1, x]] = 2
+                        #     ile_dz += 1
+                        # if w[0] == 4:
+                        #     act_pop[w[1], [x, where_roz[-1][0] + 1]] = 2
+                        #     ile_dz += 1
+
+            if ile_dz == 0:  # wydłużenie czasu lub uskok przed lokalem
+                go_min = 1
+                if limit_block[2] == 1:  # dodanie dnia
+                    act_new = np.zeros((len(act_pop), len(act_pop[0]) + 1))
+                    for licz, m in enumerate(range(len(act_pop))):
+                        w = list(act_pop[m])
+                        w.insert(index_list[0],0)
+                        if licz in lis and act_pop[m,index_list[0]] != 0:
+                            w[index_list[0]] = act_pop[m,index_list[0]]
+                            w[index_list[0] + 1] = 0
+
+                        act_new[m] = w
+                        population.append(act_new)
+            else:
+                print(act_pop)
+                population.append(act_pop)
+
+        if min_w > max_w or go_min == 1:
+            print("min")
+            # print(act_pop)
+            index_list = list(np.where(resources[i][optim_resource - 1] == min(resources[i][optim_resource - 1]))[0])
             for x in reversed(index_list):
                 idx_l = -1
                 idx_p = -1
+                print(act_pop)
+                for licz, il in enumerate(act_pop[:, x]):
+                    if il == 1:
+                        cz = k[v.index(licz)]
+                        rel_mat = [licz]
+                        for rel in c.enum_data:
+                            if (rel, cz) in c.relation_list or (cz, rel) in c.relation_list:
+                                num_rel = c.enum_data[rel]
+                                rel_mat.append(num_rel)
                 for y1 in reversed(range(x)):
-                    if sum(act_pop)[y1] > 1:  # index skąd bierzemy elementy
+                    # if sum(act_pop)[y1] > 1 and y1 not in index_list:  # index skąd bierzemy elementy pozwala na zamienianie kolejności elementami jak to zabezpieczyć
+                    if sum(act_pop)[y1] > 1:
                         idx_l = y1
                         break
-                if x+1 != len(population[0][0]):
-                    for y2 in range(x + 1, len(population[0][0])):
-                        if sum(act_pop)[y2] > 1:  # index skąd bierzemy elementy
+                if x + 1 != len(population[i][0]):
+                    for y2 in range(x + 1, len(population[i][0])):
+                        # if sum(act_pop)[y2] > 1 and y2 not in index_list:  # index skąd bierzemy elementy
+                        if sum(act_pop)[y2] > 1:
                             idx_p = y2
                             break
+
                 list_wynik = []
-                lis = [c.enum_data[x] for x in c.enum_task.keys() if x not in critical_path]
                 if idx_l != -1:
-                    for licz, il in enumerate(act_pop[:,idx_l]):
-                        if licz in lis and il == 1:
-                            list_wynik.append((idx_l, licz, data.loc[licz, f'R{r}']))
+                    for licz, il in enumerate(act_pop[:, idx_l]):
+                        if licz in lis and il == 1 and licz not in rel_mat:
+                            list_wynik.append((idx_l, licz, data.loc[licz, f'R{optim_resource}']))
+                        if licz in lis and il == 2 and licz not in rel_mat:
+                            list_wynik.append((idx_l, licz, data.loc[licz, f'R{optim_resource}']/2))
                 if idx_p != -1:
-                    for licz, ip in enumerate(act_pop[:,idx_p]):
-                        if licz not in lis and ip == 1:
-                            list_wynik.append((idx_p, licz, data.loc[licz, f'R{r}']))
-                maximum = 0
-                z = 0
-                idx = 0
-                for m in list_wynik:
-                    if m[2] > maximum:
-                        maximum = m[2]
-                        z = m[1]
-                        idx = m[0]
+                    for licz, ip in enumerate(act_pop[:, idx_p]):
+                        if licz in lis and ip == 1 and licz not in rel_mat:
+                            list_wynik.append((idx_p, licz, data.loc[licz, f'R{optim_resource}']))
+                        if licz in lis and ip == 2 and licz not in rel_mat:
+                            list_wynik.append((idx_p, licz, data.loc[licz, f'R{optim_resource}']/2))
 
-                act_pop[z,idx] = 0
-                act_pop[z,x] = 1
-                population[i] = act_pop
+                # maximum = 0
+                # z = 0
+                # idx = 0
+                # for m in list_wynik:  # utyka na jednym rozwiązaniu nie sprawdzając innych
+                #     if m[2] > maximum:
+                #         maximum = m[2]
+                #         z = m[1]
+                #         idx = m[0]
 
-        else:
-            index_list = np.where(resources[i][0] == max(resources[i][0]))[0]
-            print(index_list)
-            print(population[i])
+                if len(list_wynik) == 0:
+                    continue
+                # if go_min == 0:
+                num = random.randint(0, (len(list_wynik)) - 1)
+                maximum = list_wynik[num][2]
+                z = list_wynik[num][1]
+                idx = list_wynik[num][0]
+
+                if limit_block[0] == 1:  # Rozdzielanie zasobów
+                    if act_pop[z,idx] == 2 and act_pop[z, x] == 2:
+                        act_pop[z, x] = 1
+                        act_pop[z, idx] = 0
+                    # elif act_pop[z,idx] != 0 and act_pop[z, x] != 0:
+                    else:
+                        act_pop[z, x], act_pop[z, idx] = act_pop[z, idx], act_pop[z, x]
+                    # else:
+                    #     act_pop[z, x] = act_pop[z, idx]
+                    #     act_pop[z, idx] = 0
+
+                else:  # Alokacja zasobów
+                    if act_pop[z, x] == 0:
+                        if x > idx:  # przesunięcie w prawo
+                            L_z = list(act_pop[z].copy())
+                            l_elem = x - idx
+                            for ll in range(l_elem):
+                                L_z.pop(-1)
+                                L_z.insert(0, 0)
+                            act_pop[z] = L_z
+
+                        else:  # przesunięcie w lewo
+                            L_z = list(act_pop[z].copy())
+                            l_elem = idx - x
+                            for ll in range(l_elem):
+                                L_z.pop(0)
+                                L_z.append(0)
+                            act_pop[z] = L_z
+
+            # print(act_pop)
+            population.append(act_pop)
 
     return population
 
 
-def plot_resource(solution, resource_nb=1, xl=0, yl=0):
+def plot_resource(solution, resource_nb=1, start = 1, xl=0, yl=0):
     new_solution = []
+    print(solution)
     for idx, i in enumerate(solution):
-        w = np.where(i == 1, data.loc[idx, f'R{resource_nb}'], 0)
-        new_solution.append(w)
+        w1 = np.where(i == 1, data.loc[idx, f'R{resource_nb}'], 0)
+        w2 = np.where(i == 2, data.loc[idx, f'R{resource_nb}'] / 2, 0)
+        new_solution.append(w1 + w2)
 
     fig, ax = plt.subplots()
     N = len(solution[0])
@@ -279,7 +411,36 @@ def plot_resource(solution, resource_nb=1, xl=0, yl=0):
     ax.set_ylabel("Zasób")
     ax.set_xlabel("Dzień")
     ax.legend()
-    plt.show()
+    if resource_nb == 1 and start == 1:
+        plt.savefig("wynik1_s.png")
+        plt.show()
+    if resource_nb == 2 and start == 1:
+        plt.savefig("wynik2_s.png")
+        plt.show()
+    if resource_nb == 3 and start == 1:
+        plt.savefig("wynik3_s.png")
+        plt.show()
+    if resource_nb == 4 and start == 1:
+        plt.savefig("wynik4_s.png")
+        plt.show()
+    if resource_nb == 5 and start == 1:
+        plt.savefig("wynik5_s.png")
+        plt.show()
+    if resource_nb == 1 and start == 0:
+        plt.savefig("wynik1.png")
+        plt.show()
+    if resource_nb == 2 and start == 0:
+        plt.savefig("wynik2.png")
+        plt.show()
+    if resource_nb == 3 and start == 0:
+        plt.savefig("wynik3.png")
+        plt.show()
+    if resource_nb == 4 and start == 0:
+        plt.savefig("wynik4.png")
+        plt.show()
+    if resource_nb == 5 and start == 0:
+        plt.savefig("wynik5.png")
+        plt.show()
 
 
 def plot_resource_mean(resource, resource_nb=1, xl=0, yl=0):
@@ -299,11 +460,6 @@ def plot_resource_mean(resource, resource_nb=1, xl=0, yl=0):
     ax.set_xlabel("Dzień")
     ax.legend()
     plt.show()
-
-
-def plot_Gantt():  # problem z przerwami i przekroczeniem czasu czy może może zosatc w formie macierzy katóra w miejscah jedynie wskazuje to co trzeba
-
-    print("nie")
 
 
 def plot_all_resources(resources, xl=0, yl=0):
@@ -329,14 +485,16 @@ def plot_all_resources(resources, xl=0, yl=0):
 
 
 if __name__ == "__main__":
+
     # Struktury danych
-    data = pd.read_excel("Zestaw3.xlsx")  # Tabela z bazą danych
-    size = 20  # Rozmiar populacji
-    L_iter = 30  # Liczba iteracji algorytmu
+    data = pd.read_excel("Scenariusz 2.xlsx")  # Tabela z bazą danych
+    size = 50  # Rozmiar populacji
+    L_iter = 1000  # Liczba iteracji algorytmu
     goal_function = 2  # Funkcja celu 1. maksymlany zasób, 2. Suma odchyleń od średniej
     resource_number = 2  # Liczba zasobów dla projektu
-    weight_resource = [2, 1, 1, 1, 1]  # Wagi dla poszczególnych zasobów
+    weight_resource = [1, 1]  # Wagi dla poszczególnych zasobów
     selection_mode = 1  # Obcja wyboru selekcji 1. Koło ruletki, 2. Selekcja rankingowa
+    limit_block = [1, 1, 0]  # Blokady dla opodwiednich mutacji w algorytmie 1 - włączone 0 - wyłączone, 1. Rozdzielanie zadań, 2. Dzielenie zasobów na pół, 3. Wydłużanie czasu
 
     # CPM
     wynik = []
@@ -346,32 +504,45 @@ if __name__ == "__main__":
     # Algorytm
     Iter = 0
     roz = first_result()
-    new_pop = create_population(first_soluction=roz, size = size)
+    new_pop = create_population(first_soluction=roz, size=size)
     while Iter < L_iter:
         fit, res = fitness(population=new_pop, goal_f=goal_function, res_num=resource_number, weight=weight_resource)
+        print(fit)
         w = min(fit, key=fit.get)
+        print(w)
         wynik.append(new_pop[w])
-        new_pop, new_res, new_fit = selection(population=new_pop,fitness=fit,resource=res, mode=selection_mode, size=15)
+        new_pop, new_res, new_fit = selection(population=new_pop, fitness=fit, resource=res, mode=selection_mode,size=30)
         # Losowanie 2 elementów do krzyżwoanie jesli będziemy chcieli zmieniać konkretne należy to zmienić
         l1 = random.choice(list(new_fit.keys()))
         l2 = random.choice(list(new_fit.keys()))
         while l1 == l2:
             l2 = random.choice(list(new_fit.keys()))
-        new_pop = cross(population=new_pop, f=l1, g =l2)
-        # losowane osobniki, które nie były poddane krzyżowaniu
-        m_licz = math.ceil(len(new_pop)*0.1)
+        new_pop = cross(population=new_pop, f=l1, g=l2)
+        m_licz = math.ceil(len(new_pop) * 0.1)
         m_list = []
         for i in range(m_licz):
             l = random.choice(list(new_fit.keys()))
             while l in m_list:
                 l = random.choice(list(new_fit.keys()))
             m_list.append(l)
-        new_pop = mutation(population=new_pop, resources=new_res, mutation_list= m_list)
+        optim = random.choices([1,2],weight_resource, k = 1) #wybór optymalizacji parametrycznej
+        new_pop = mutation(population=new_pop, resources=new_res, mutation_list=m_list, limit_block=limit_block, optim_resource=optim[0])
         Iter += 1
 
-    print(wynik)
+    fit, res = fitness(population=new_pop, goal_f=goal_function, res_num=resource_number, weight=weight_resource)
+    w = min(fit, key=fit.get)
+    wynik.append(new_pop[w])
+    print("wynik")
+    print(fit)
+    print(w)
+    plot_resource(roz, 1)
+    print(roz)
     plot_resource(wynik[-1], 1)
-    # plot_Gantt(roz)
+    plot_resource(wynik[-1], 2)
+    # plot_resource_mean(wynik[-1],1)
+    # fit, res = fitness(population=new_pop, goal_f=goal_function, res_num=resource_number, weight=weight_resource)
+    # print(res)
+    # # plot_Gantt(roz)
     # pop = create_population(roz, 15)
     # fit, res = fitness(pop,1,2,15,[1,1,1,1,1])
     # l1,l2 = roulette(fit,2)
@@ -401,13 +572,36 @@ if __name__ == "__main__":
 #                    [0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
 #                    [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0]])
 #
-#     c1 = np.array([[1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-#                    [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0]])
-#     pop = [c1,c2]
-#     print(cross(pop,0,1))
+# c1 = np.array([[1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#                [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+#                [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+#                [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#                [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+#                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0]])
+#
+# w1 =  np.array([[0., 0., 0., 0., 0., 0., 0.],
+#        [1., 1., 0., 0., 0., 0., 0.],
+#        [1., 1., 1., 0., 0., 0., 0.],
+#        [1., 1., 0., 0., 0., 0., 0.],
+#        [0., 0., 1., 1., 1., 0., 0.],
+#        [0., 0., 0., 2., 2., 2., 2.],
+#        [0., 0., 1., 1., 1., 0., 0.],
+#        [0., 0., 0., 0., 0., 1., 1.],
+#        [0., 0., 0., 0., 0., 1., 1.],
+#        [0., 0., 0., 0., 0., 0., 0.]])
+# plot_resource(w1, 1)
 
 
+# new_pop = [c1, w1]
+# new_pop = cross(population=new_pop, f=0, g=1)
+# print(new_pop)
+# new_pop = [w1]
+# fit, new_res = fitness(population=new_pop, goal_f=goal_function, res_num=resource_number, weight=weight_resource)
+# m_list = [0]
+# print(fit)
+# print(new_res)
+# new_pop = mutation(population=new_pop, resources=new_res, mutation_list= m_list, limit_block=limit_block)
+# print(new_pop)
+# # plot_resource(roz, 1)
+# plot_resource(new_pop[0], 1)
+# plot_resource(new_pop[1], 1)
