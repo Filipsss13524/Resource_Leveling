@@ -131,13 +131,8 @@ def selection(population, fitness, resource, mode, size):
         new_list = []
         val = 1 / (list(fitness.values()) / sum(fitness.values()))
         weight = val / sum(val) * 100
-        # print(weight)
-        # print(len(weight))
         while len(new_list) != size:
-            # print("HELP ME")
             licz = random.choices(list(fitness.keys()), weights=weight, k=15)
-            # print(licz)
-            # print(weight)
             if licz[0] not in new_list:
                 new_list.append(licz[0])
                 weight[licz[0]] = 0.5
@@ -176,8 +171,6 @@ def cross(population, f, g):
             if np.all(rozf[l] == rozg[l]):
                 continue
             else:
-                # where_rozf = np.argwhere(rozf[l] == 1)
-                # where_rozg = np.argwhere(rozg[l] == 1)
                 where_rozf = np.argwhere(rozf[l] != 0)
                 where_rozg = np.argwhere(rozg[l] != 0)
                 where_start = [where_rozf[0][0] if where_rozf[0][0] < where_rozg[0][0] else where_rozg[0][0]]
@@ -198,24 +191,6 @@ def cross(population, f, g):
                 if sum_rozg == 0:
                     rozg_copy[l] = rozf[l]
                     population.append(rozg_copy)
-                # Psuje wyniki
-                # if sum_rozf != 0 and sum_rozg != 0 and (
-                #         data.loc[l, 'Time'] < where_end[0] - where_start[0] - sum_rozg or data.loc[l, 'Time'] < where_end[
-                #     0] - where_start[0] - sum_rozf):
-                #     w_rozf = rozf_copy[rel_mat, where_start[0]:where_end[0] + 1]
-                #     w_rozg = rozg_copy[rel_mat, where_start[0]:where_end[0] + 1]
-                #     if (sum(w_rozf[:][0]) > 0 or sum(w_rozg[:][0]) > 0) and (sum(w_rozf[:][-1]) > 0 or sum(w_rozg[:][-1]) > 0):
-                #         nc = np.zeros(len(rozf[0]))
-                #         for idx, x, y in zip(np.linspace(where_start[0], where_end[0], len(w_rozf[0])), sum(w_rozf),
-                #                              sum(w_rozg)):
-                #             if x == 0 and y == 0 and sum(nc) < data.loc[l, 'Time']:
-                #                 nc[int(idx)] = 1
-                #         rozg_copy[l] = nc[:]
-                #         rozf_copy[l] = nc[:]
-                #         population.append(rozg_copy)
-                #         population.append(rozf_copy)
-                #     else:
-                #         continue
 
     return population
 
@@ -230,9 +205,8 @@ def mutation(population, resources, mutation_list, limit_block, optim_resource =
         k = list(c.enum_data.keys())
         v = list(c.enum_data.values())
         go_min = 0
-        maxxx = np.linspace(1,int(L_iter/10),int(L_iter/10))  # wymusza maxa co 10 iteracji
+        maxxx = np.linspace(1,int(L_iter/10),int(L_iter/10))
         if Iter / 10 in maxxx:
-            # print("wykonałem")
             max_w += 2
         if max_w > min_w:
             print("max")
@@ -255,10 +229,6 @@ def mutation(population, resources, mutation_list, limit_block, optim_resource =
                                 list_wynik.append((1, licz, data.loc[licz, f'R{optim_resource}']))  # left bliski
                             if x != len(population[i][0]) - 1 and np.all(act_pop[rel_mat, x + 1] == 0):
                                 list_wynik.append((2, licz, data.loc[licz, f'R{optim_resource}']))  # right bliski
-                            # if x != 0 and where_roz[0] != x and where_roz[0] - 1 != -1 and np.all(act_pop[rel_mat, where_roz[0] - 1] == 0):
-                            #     list_wynik.append((3, licz, data.loc[licz, f'R{optim_resource}']))  # left daleki
-                            # if x != len(population[i][0]) and where_roz[-1] != len(population[i][0]) - 1 and np.all(act_pop[rel_mat, where_roz[-1] + 1] == 0):
-                            #     list_wynik.append((4, licz, data.loc[licz, f'R{optim_resource}']))  # right daleki
 
                     if list_wynik:
                         num = random.randint(0, (len(list_wynik)) - 1)
@@ -269,12 +239,6 @@ def mutation(population, resources, mutation_list, limit_block, optim_resource =
                         if w[0] == 2:
                             act_pop[w[1], x:x+2] = 2
                             ile_dz += 1
-                        # if w[0] == 3:
-                        #     act_pop[w[1], [where_roz[0][0] - 1, x]] = 2
-                        #     ile_dz += 1
-                        # if w[0] == 4:
-                        #     act_pop[w[1], [x, where_roz[-1][0] + 1]] = 2
-                        #     ile_dz += 1
 
             if ile_dz == 0:  # wydłużenie czasu lub uskok przed lokalem
                 go_min = 1
@@ -310,13 +274,11 @@ def mutation(population, resources, mutation_list, limit_block, optim_resource =
                                 num_rel = c.enum_data[rel]
                                 rel_mat.append(num_rel)
                 for y1 in reversed(range(x)):
-                    # if sum(act_pop)[y1] > 1 and y1 not in index_list:  # index skąd bierzemy elementy pozwala na zamienianie kolejności elementami jak to zabezpieczyć
                     if sum(act_pop)[y1] > 1:
                         idx_l = y1
                         break
                 if x + 1 != len(population[i][0]):
                     for y2 in range(x + 1, len(population[i][0])):
-                        # if sum(act_pop)[y2] > 1 and y2 not in index_list:  # index skąd bierzemy elementy
                         if sum(act_pop)[y2] > 1:
                             idx_p = y2
                             break
@@ -335,14 +297,6 @@ def mutation(population, resources, mutation_list, limit_block, optim_resource =
                         if licz in lis and ip == 2 and licz not in rel_mat:
                             list_wynik.append((idx_p, licz, data.loc[licz, f'R{optim_resource}']/2))
 
-                # maximum = 0
-                # z = 0
-                # idx = 0
-                # for m in list_wynik:  # utyka na jednym rozwiązaniu nie sprawdzając innych
-                #     if m[2] > maximum:
-                #         maximum = m[2]
-                #         z = m[1]
-                #         idx = m[0]
 
                 if len(list_wynik) == 0:
                     continue
@@ -356,12 +310,8 @@ def mutation(population, resources, mutation_list, limit_block, optim_resource =
                     if act_pop[z,idx] == 2 and act_pop[z, x] == 2:
                         act_pop[z, x] = 1
                         act_pop[z, idx] = 0
-                    # elif act_pop[z,idx] != 0 and act_pop[z, x] != 0:
                     else:
                         act_pop[z, x], act_pop[z, idx] = act_pop[z, idx], act_pop[z, x]
-                    # else:
-                    #     act_pop[z, x] = act_pop[z, idx]
-                    #     act_pop[z, idx] = 0
 
                 else:  # Alokacja zasobów
                     if act_pop[z, x] == 0:
@@ -539,69 +489,4 @@ if __name__ == "__main__":
     print(roz)
     plot_resource(wynik[-1], 1)
     plot_resource(wynik[-1], 2)
-    # plot_resource_mean(wynik[-1],1)
-    # fit, res = fitness(population=new_pop, goal_f=goal_function, res_num=resource_number, weight=weight_resource)
-    # print(res)
-    # # plot_Gantt(roz)
-    # pop = create_population(roz, 15)
-    # fit, res = fitness(pop,1,2,15,[1,1,1,1,1])
-    # l1,l2 = roulette(fit,2)
-    # cross(pop,l1,l2)
-    # mutation(pop, fit,res, 1)
-    # print(pop[11])
-    # print(res[11][0])
-    # fig = plt.figure(figsize=(7,5))
-    # ax = fig.add_axes([0,0,1,1])
-    # ax.bar(np.linspace(0,13, num = 14),res[11][0])
-    # plt.show()
-    # for x,y,z in zip(pop,fit,res):
-    #     print(x)
-    #     print(y)
-    #     print(z)
-    # w = np.array([0,0,0,1,1,1,0])
-    # print(np.argwhere(w==1))
-    # print(roz[[1,2],2:7])
-    # print(data.loc[1,'Time'])
-    # w = np.array([0,1,1,1,0,0])
-    # Wynik = np.where(w == 1,100,0)
-# print(data.loc[1,f'R{1}'])
-#     c2 = np.array([[1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-#                    [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-#                    [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0]])
-#
-# c1 = np.array([[1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-#                [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-#                [0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-#                [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
-#                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0]])
-#
-# w1 =  np.array([[0., 0., 0., 0., 0., 0., 0.],
-#        [1., 1., 0., 0., 0., 0., 0.],
-#        [1., 1., 1., 0., 0., 0., 0.],
-#        [1., 1., 0., 0., 0., 0., 0.],
-#        [0., 0., 1., 1., 1., 0., 0.],
-#        [0., 0., 0., 2., 2., 2., 2.],
-#        [0., 0., 1., 1., 1., 0., 0.],
-#        [0., 0., 0., 0., 0., 1., 1.],
-#        [0., 0., 0., 0., 0., 1., 1.],
-#        [0., 0., 0., 0., 0., 0., 0.]])
-# plot_resource(w1, 1)
 
-
-# new_pop = [c1, w1]
-# new_pop = cross(population=new_pop, f=0, g=1)
-# print(new_pop)
-# new_pop = [w1]
-# fit, new_res = fitness(population=new_pop, goal_f=goal_function, res_num=resource_number, weight=weight_resource)
-# m_list = [0]
-# print(fit)
-# print(new_res)
-# new_pop = mutation(population=new_pop, resources=new_res, mutation_list= m_list, limit_block=limit_block)
-# print(new_pop)
-# # plot_resource(roz, 1)
-# plot_resource(new_pop[0], 1)
-# plot_resource(new_pop[1], 1)
