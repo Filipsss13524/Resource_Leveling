@@ -33,10 +33,13 @@ The application was created in python 3.9 using libraries
 
 ## Results
 Here is an example scenario of a sequence of events in a project
+
 ![Event sequence diagram](./Image/Gant.png)
 His demand graph looked like this at first:
+
 ![Start diagram](./Image/Start.png)
 and after applying the algorithm like this:
+
 ![Start diagram](./Image/End.png)
 this shows how the application works, more examples and results can be found in the work (in Polish) attached to the repository
 
